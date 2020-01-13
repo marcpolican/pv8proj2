@@ -9,7 +9,8 @@ local scrHeight=0
 
 local horMovCnt=0
 local charSpd=1
-local charSize=14
+local charW=14
+local charH=15
 local deltaSpd=0.25
 local jumpHeight=20
 local jumpCur=0
@@ -17,6 +18,8 @@ local jumpDir=0
 local charFrame=0
 local charFacing=1 -- 0=north, 1=south, 2=west, 3=east
 local charWalkFrInt=10
+local scroll=NewPoint(0,0)
+local scrollMax=NewPoint(96,64)
 
 function Init()
   local displaySize=Display()
@@ -26,6 +29,7 @@ end
 
 function Update(timeDelta)
   CharMovement();
+  ScrollPosition(scroll.x, scroll.y)
 end
 
 function Draw()
@@ -126,21 +130,35 @@ function CharMovement()
     charFrame = (charFrame+1) % (charWalkFrInt*2)
   end
 
-end
+  local relX = (charX-scroll.x) / scrWidth
+  local relY = (charY-scroll.y) / scrHeight
 
+  if (relX < 0.5 and scroll.x > 0) then
+    scroll.x = scroll.x-1
+  elseif (relX > 0.5 and scroll.x < scrollMax.x) then
+    scroll.x = scroll.x+1
+  end
+
+  if (relY < 0.5 and scroll.y > 0) then
+    scroll.y = scroll.y-1
+  elseif (relY > 0.5 and scroll.y < scrollMax.y) then
+    scroll.y = scroll.y+1
+  end
+
+end
 
 function WillCharCollide(x,y)
 
   local flag = Flag(x/8, y/8)
   if (flag == 0) then return true end
 
-  flag = Flag((x+charSize)/8, y/8)
+  flag = Flag((x+charW)/8, y/8)
   if (flag == 0) then return true end
 
-  flag = Flag((x+charSize)/8, (y+charSize)/8)
+  flag = Flag((x+charW)/8, (y+charH)/8)
   if (flag == 0) then return true end
 
-  flag = Flag(x/8, (y+charSize)/8)
+  flag = Flag(x/8, (y+charH)/8)
   if (flag == 0) then return true end
 
   return false
