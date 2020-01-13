@@ -20,6 +20,11 @@ local charFacing=1 -- 0=north, 1=south, 2=west, 3=east
 local charWalkFrInt=10
 local scroll=NewPoint(0,0)
 local scrollMax=NewPoint(96,64)
+local shakeTime=0
+local shakeDirX=0
+local shakeDirY=0
+local shakeOffsetX=0
+local shakeOffsetY=0
 
 function Init()
   local displaySize=Display()
@@ -29,7 +34,8 @@ end
 
 function Update(timeDelta)
   CharMovement();
-  ScrollPosition(scroll.x, scroll.y)
+  UpdateScreenShake();
+  ScrollPosition(scroll.x + shakeOffsetX, scroll.y + shakeOffsetY)
 end
 
 function Draw()
@@ -41,7 +47,6 @@ end
 function DrawDebug()
   local str = "x:" .. charX .. ",y:" .. charY
   DrawText(str,0,200,4,"medium",15)
-
 end
 
 function DrawChar()
@@ -118,6 +123,11 @@ function CharMovement()
     charFacing=3
   end
 
+  if (DidHitEnemy(newX,newY)) then 
+    shakeTime = 18
+    return
+  end
+
   if (WillCharCollide(newX, newY) == false) then
     charX = newX
     charY = newY
@@ -162,4 +172,49 @@ function WillCharCollide(x,y)
   if (flag == 0) then return true end
 
   return false
+end
+
+function DidHitEnemy(x,y)
+
+  local enemy=10
+
+  local flag = Flag(x/8, y/8)
+  if (flag == enemy) then return true end
+
+  flag = Flag((x+charW)/8, y/8)
+  if (flag == enemy) then return true end
+
+  flag = Flag((x+charW)/8, (y+charH)/8)
+  if (flag == enemy) then return true end
+
+  flag = Flag(x/8, (y+charH)/8)
+  if (flag == enemy) then return true end
+
+  return false
+  
+
+end
+
+function UpdateScreenShake()
+  if (shakeTime <= 0) then return end;
+
+  local multiples=3
+  local magnitude=3
+  local step = shakeTime % multiples;
+  if (step == 0) then
+    shakeDirX = (math.random() * magnitude * 2) - magnitude
+    shakeDirY = (math.random() * magnitude * 2) - magnitude
+  end
+
+  local t = multiples-step/multiples;
+
+  shakeOffsetX = shakeDirX * t;
+  shakeOffsetY = shakeDirY * t;
+
+  shakeTime = shakeTime - 1
+
+  if (shakeTime == 0) then
+    shakeOffsetX = 0
+    shakeOffsetY = 0
+  end
 end
