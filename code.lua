@@ -3,6 +3,7 @@ LoadScript("vector2")
 local scrSize=Vector2:new{x=0,y=0}
 
 local char=Vector2:new{x=16,y=96}
+local charAttack=0
 local charSpd=1
 local charSize=Vector2:new{x=14,y=15}
 local charFrame=0
@@ -16,7 +17,13 @@ local shakeTime=0
 local shakeDir=Vector2:new{x=0,y=0}
 local shakeOffset=Vector2:new{x=0,y=0}
 
-local enemies={{x=4,y=4}, {x=18,y=6}}
+local enemies={
+  {x=4,y=4,life=1}, 
+  {x=18,y=6,life=1},
+  {x=26,y=10,life=1},
+  {x=34,y=14,life=1}
+}
+local enemyFrame=0
 
 function Init()
   local displaySize=Display()
@@ -25,7 +32,8 @@ function Init()
 end
 
 function Update(timeDelta)
-  CharMovement();
+  CharMovementUpdate();
+  CharAttackUpdate();
   UpdateScreenShake();
   ScrollPosition(scroll.x + shakeOffset.x, scroll.y + shakeOffset.y)
 end
@@ -34,7 +42,7 @@ function Draw()
   RedrawDisplay()
   DrawEnemies()
   DrawChar()
-  DrawDebug()
+  --DrawDebug()
 end
 
 function DrawDebug()
@@ -48,35 +56,103 @@ function DrawChar()
   if (charFacing == 0) then
     DrawSpriteBlock(6,char.x,char.y,2,2,charFrame >= charWalkFrInt)
 
+    if (charAttack > 0) then
+      DrawSpriteBlock(37,char.x+4,char.y-8)
+    end
+
   -- facing south
   elseif (charFacing == 1) then
     DrawSpriteBlock(0,char.x,char.y,2,2,charFrame >= charWalkFrInt)
 
+    if (charAttack > 0) then
+      DrawSpriteBlock(37,char.x+4,char.y+16,1,1,false,true)
+    end
+
   -- facing west
   elseif (charFacing == 2) then
-    if (charFrame < charWalkFrInt) then
-      DrawSpriteBlock(2,char.x,char.y,2,2,true)
-    else
-      DrawSpriteBlock(4,char.x,char.y,2,2,true)
+    local id = 4
+    if (charFrame < charWalkFrInt) then id = 2; end
+
+    DrawSpriteBlock(id,char.x,char.y,2,2,true)
+
+    if (charAttack > 0) then
+      DrawSpriteBlock(36,char.x-8,char.y+4,1,1,true,false)
     end
 
   -- facing east
   else
-    if (charFrame < charWalkFrInt) then
-      DrawSpriteBlock(2,char.x,char.y,2,2,false)
-    else
-      DrawSpriteBlock(4,char.x,char.y,2,2,false)
+    local id = 4
+    if (charFrame < charWalkFrInt) then id = 2; end
+
+    DrawSpriteBlock(id,char.x,char.y,2,2,false)
+
+    if (charAttack > 0) then
+      DrawSpriteBlock(36,char.x+16,char.y+4)
     end
   end
 end
 
 function DrawEnemies()
-  for key,val in ipairs(enemies) do
-    DrawSpriteBlock(64,val.x*8,val.y*8,2,2,false)
+  local t = enemyFrame/60 * math.pi * 2
+  local offset = math.sin(t)
+
+  if     offset > 0.5  then offset = 1
+  elseif offset < -0.5 then offset = -1
+  else   offset = 0 
   end
+
+  for key,val in ipairs(enemies) do
+    if val.life > 0 then
+      DrawSpriteBlock(64,val.x*8,val.y*8+offset,2,2,false)
+    end
+  end
+
+  enemyFrame = enemyFrame+1
+  if (enemyFrame >= 60) then enemyFrame = 0 end
 end
 
-function CharMovement()
+function CharAttackUpdate()
+  charAttack = charAttack-1
+  if Button(Buttons.A, InputState.Down, 0) then
+    charAttack = 10
+  end
+
+  -- check if we hit an enemy
+  if (charAttack > 0) then
+
+    local attackPoint = Vector2:new{x=char.x,y=char.y}
+    
+    if     (charFacing == 0) then attackPoint.y = char.y - 16
+    elseif (charFacing == 1) then attackPoint.y = char.y + 16
+    elseif (charFacing == 2) then attackPoint.x = char.x - 16
+    elseif (charFacing == 3) then attackPoint.x = char.x + 16
+    end
+
+    for key,val in ipairs(enemies) do
+      if val.life > 0 then
+
+        local r1={x1=attackPoint.x, x2=attackPoint.x+16, y1=attackPoint.y, y2=attackPoint.y+16}
+        local r2={x1=val.x*8,       x2=val.x*8+16,       y1=val.y*8,       y2=val.y*8+16}
+
+        if IsIntersect(r1,r2) then
+          val.life = val.life-1
+          shakeTime = 10
+        end
+      end
+    end
+  end
+
+end
+
+function IsIntersect(r1,r2)
+
+  if r1.x2 < r2.x1 or r1.x1 > r2.x2 then return false end 
+  if r1.y2 < r2.y1 or r1.y1 > r2.y2 then return false end
+
+  return true
+end
+
+function CharMovementUpdate()
 
   local new=Vector2:new{x=char.x, y=char.y}
 
@@ -104,24 +180,22 @@ function CharMovement()
   if (char.x == new.x and char.y == new.y) then
     return
   end
+
+  local newFacing = charFacing
   
   -- detect facing vertical
-  if (new.y < char.y) then
-    charFacing=0
-  elseif (new.y > char.y) then
-    charFacing=1
+  if     (new.y < char.y) then newFacing = 0
+  elseif (new.y > char.y) then newFacing = 1
   end
 
   -- detect facing horizontal, may override vertical facing
-  if (new.x < char.x) then
-    charFacing=2
-  elseif (new.x > char.x) then
-    charFacing=3
+  if     (new.x < char.x) then newFacing = 2
+  elseif (new.x > char.x) then newFacing = 3
   end
 
-  -- check if will hit enemy
-  if (WillCharCollide(new.x,new.y,10)) then 
-    shakeTime = 18
+  -- don't move if facing changes
+  if (newFacing != charFacing) then
+    charFacing = newFacing
     return
   end
 
@@ -183,7 +257,7 @@ function UpdateScreenShake()
   if (shakeTime <= 0) then return end;
 
   local multiples=3
-  local magnitude=3
+  local magnitude=1
   local step = shakeTime % multiples;
   if (step == 0) then
     shakeDir.x = (math.random() * magnitude * 2) - magnitude
