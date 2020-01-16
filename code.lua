@@ -9,6 +9,7 @@ local charSize=Vector2:new{x=14,y=15}
 local charFrame=0
 local charFacing=1 -- 0=north, 1=south, 2=west, 3=east
 local charWalkFrInt=10
+local charDead=false
 
 local scroll=Vector2:new{x=0,y=0}
 local scrollMax=Vector2:new{x=96,y=64}
@@ -33,6 +34,7 @@ end
 
 function Update(timeDelta)
   CharMovementUpdate();
+  CharCheckEnemyHit();
   CharAttackUpdate();
   UpdateScreenShake();
   ScrollPosition(scroll.x + shakeOffset.x, scroll.y + shakeOffset.y)
@@ -51,6 +53,11 @@ function DrawDebug()
 end
 
 function DrawChar()
+
+  if (charDead) then
+    DrawSpriteBlock(38,char.x,char.y,2,2)
+    return;
+  end
 
   -- facing north
   if (charFacing == 0) then
@@ -112,6 +119,9 @@ function DrawEnemies()
 end
 
 function CharAttackUpdate()
+
+  if (charDead) then return end
+
   charAttack = charAttack-1
   if Button(Buttons.A, InputState.Down, 0) then
     charAttack = 10
@@ -144,6 +154,27 @@ function CharAttackUpdate()
 
 end
 
+function CharCheckEnemyHit()
+
+  if (charDead) then return end
+
+  local r1={x1=char.x+2, x2=char.x+charSize.x, y1=char.y+2, y2=char.y+charSize.y}
+
+  for key,val in ipairs(enemies) do
+    if val.life > 0 then
+
+      local r2={x1=val.x*8+2, x2=val.x*8+14, y1=val.y*8+2, y2=val.y*8+14}
+
+      if IsIntersect(r1,r2) then
+        charDead=true
+        shakeTime = 30
+        return
+      end
+    end
+  end
+
+end
+
 function IsIntersect(r1,r2)
 
   if r1.x2 < r2.x1 or r1.x1 > r2.x2 then return false end 
@@ -153,6 +184,8 @@ function IsIntersect(r1,r2)
 end
 
 function CharMovementUpdate()
+
+  if (charDead) then return end
 
   local new=Vector2:new{x=char.x, y=char.y}
 
